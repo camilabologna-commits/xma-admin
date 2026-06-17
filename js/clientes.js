@@ -46,10 +46,11 @@ function renderClientesTable() {
       <thead>
         <tr>
           <th>Nombre</th>
-          <th>Ubicación</th>
           <th>Contacto</th>
-          <th>Vendedor habitual</th>
+          <th>Ubicación</th>
+          <th>Teléfono / Email</th>
           <th class="text-right">Total comprado</th>
+          <th>Vendedor habitual</th>
           <th></th>
         </tr>
       </thead>
@@ -59,10 +60,11 @@ function renderClientesTable() {
           return `
           <tr>
             <td style="font-weight:500;">${escapeHtml(c.nombre)}</td>
+            <td class="muted">${escapeHtml(c.contacto || '—')}</td>
             <td class="muted">${escapeHtml(ubicacion)}</td>
             <td class="muted">${escapeHtml(c.telefono || c.email || '—')}</td>
-            <td>${escapeHtml(c.vendedores?.nombre || '—')}</td>
             <td class="text-right mono">${fmtMoney(totalPorCliente[c.id] || 0)}</td>
+            <td>${escapeHtml(c.vendedores?.nombre || '—')}</td>
             <td class="text-right">
               <button class="icon-btn" data-edit="${c.id}">Editar</button>
               <button class="icon-btn" data-del="${c.id}">Borrar</button>
@@ -85,6 +87,7 @@ function openClienteModal(id) {
     </div>
     <form id="cliente-form">
       <div class="field"><label>Nombre</label><input type="text" id="c-nombre" value="${c ? escapeHtml(c.nombre) : ''}" required></div>
+      <div class="field"><label>Contacto</label><input type="text" id="c-contacto" value="${c ? escapeHtml(c.contacto || '') : ''}" placeholder="Nombre de la persona de contacto"></div>
       <div class="grid grid-2">
         <div class="field"><label>Teléfono</label><input type="text" id="c-telefono" value="${c ? escapeHtml(c.telefono || '') : ''}"></div>
         <div class="field"><label>Email</label><input type="email" id="c-email" value="${c ? escapeHtml(c.email || '') : ''}"></div>
@@ -114,6 +117,7 @@ function openClienteModal(id) {
     e.preventDefault();
     const payload = {
       nombre:       document.getElementById('c-nombre').value.trim(),
+      contacto:     document.getElementById('c-contacto').value.trim() || null,
       telefono:     document.getElementById('c-telefono').value.trim() || null,
       email:        document.getElementById('c-email').value.trim() || null,
       departamento: document.getElementById('c-departamento').value.trim() || null,
