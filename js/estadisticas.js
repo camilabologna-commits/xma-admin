@@ -22,11 +22,11 @@ function renderEstadisticas() {
   const mesesOrdenados = Object.keys(porMes).sort();
   const ultimosMeses = mesesOrdenados.slice(-12);
 
-  // Proyección simple: promedio móvil de los últimos 3 meses
+  // Proyección: promedio móvil últimos 3 meses
   const last3 = ultimosMeses.slice(-3).map(m => porMes[m].total);
   const promedioMovil = last3.length > 0 ? last3.reduce((a, b) => a + b, 0) / last3.length : 0;
 
-  // Tendencia por regresión lineal
+  // Tendencia lineal
   let proyeccionTendencia = promedioMovil;
   if (ultimosMeses.length >= 2) {
     const ys = ultimosMeses.map(m => porMes[m].total);
@@ -59,6 +59,16 @@ function renderEstadisticas() {
   });
   const topClientes = Object.entries(porCliente).sort((a, b) => b[1] - a[1]).slice(0, 8);
 
+  // Ventas por categoría
+  const categoriaTotal = {};
+  state.ventas.forEach(v => {
+    (v.venta_items || []).forEach(it => {
+      const variante = state.variantes.find(va => va.id === it.variante_id);
+      const cat = variante?.productos?.categoria || 'Otro';
+      categoriaTotal[cat] = (categoriaTotal[cat] || 0) + Number(it.subtotal);
+    });
+  });
+
   content.innerHTML = `
     <div class="page-header">
       <div>
@@ -86,30 +96,31 @@ function renderEstadisticas() {
     </div>
 
     <div class="chart-card" style="margin-bottom:18px;">
-      <div class="section-title">Facturación mensual</div>
+      <div class="section-title">Facturación mensual total</div>
       <div class="chart-wrap"><canvas id="chart-mensual"></canvas></div>
     </div>
 
-    <div class="grid grid-2">
+    <div class="grid grid-2" style="margin-bottom:18px;">
       <div class="chart-card">
         <div class="section-title">Productos más vendidos (unidades)</div>
         <div class="chart-wrap"><canvas id="chart-productos"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="section-title">Facturación por cliente (top 8)</div>
-        <div class="chart-wrap"><canvas id="chart-clientes"></canvas></div>
+        <div class="section-title">Facturación por categoría</div>
+        <div class="chart-wrap"><canvas id="chart-categoria"></canvas></div>
       </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="section-title">Facturación por cliente (top 8)</div>
+      <div class="chart-wrap"><canvas id="chart-clientes"></canvas></div>
     </div>
   `;
 
-  if (ultimosMeses.length === 0) {
-    document.querySelector('.chart-card').innerHTML = `<div class="section-title">Facturación mensual</div><div class="empty-state"><div class="big">—</div>Todavía no hay suficientes ventas para mostrar estadísticas.</div>`;
-    return;
-  }
+  if (ultimosMeses.length === 0) return;
 
-  // Chart 1: facturación mensual total
-  const ctx1 = document.getElementById('chart-mensual');
-  chartInstances.mensual = new Chart(ctx1, {
+  // Chart 1: facturación mensual
+  chartInstances.mensual = new Chart(document.getElementById('chart-mensual'), {
     type: 'bar',
     data: {
       labels: ultimosMeses.map(m => monthLabel(m + '-01')),
@@ -121,46 +132,42 @@ function renderEstadisticas() {
   });
 
   // Chart 2: productos top
-  if (topProductos.length > 0) {
-    const ctx2 = document.getElementById('chart-productos');
-    chartInstances.productos = new Chart(ctx2, {
-      type: 'bar',
-      data: {
-        labels: topProductos.map(p => p[0].length > 28 ? p[0].slice(0, 28) + '…' : p[0]),
-        datasets: [{ label: 'Unidades', data: topProductos.map(p => p[1]), backgroundColor: '#181715' }]
-      },
-      options: { ...chartBaseOptions(false), indexAxis: 'y' }
-    });
-  }
+  chartInstances.productos = new Chart(document.getElementById('chart-productos'), {
+    type: 'bar',
+    data: {
+      labels: topProductos.map(p => p[0].length > 28 ? p[0].slice(0, 28) + '…' : p[0]),
+      datasets: [{ label: 'Unidades', data: topProductos.map(p => p[1]), backgroundColor: '#181715' }]
+    },
+    options: { ...chartBaseOptions(false), indexAxis: 'y' }
+  });
 
-  // Chart 3: facturación por cliente
-  if (topClientes.length > 0) {
-    const ctx3 = document.getElementById('chart-clientes');
-    const palette = ['#181715','#3A3835','#5C5A54','#7E7B74','#9A9690','#B6B3AD','#D2CFC9','#E6E3DD'];
-    chartInstances.clientes = new Chart(ctx3, {
-      type: 'doughnut',
-      data: {
-        labels: topClientes.map(c => c[0]),
-        datasets: [{
-          data: topClientes.map(c => c[1]),
-          backgroundColor: palette.slice(0, topClientes.length),
-          borderWidth: 0,
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'bottom', labels: { font: { family: 'Archivo' }, color: '#5C5A54', boxWidth: 12 } },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => ` ${fmtMoney(ctx.parsed)}`
-            }
-          }
-        }
-      }
-    });
-  }
+  // Chart 3: categoría (donut)
+  const catLabels = Object.keys(categoriaTotal);
+  chartInstances.categoria = new Chart(document.getElementById('chart-categoria'), {
+    type: 'doughnut',
+    data: {
+      labels: catLabels,
+      datasets: [{
+        data: catLabels.map(c => categoriaTotal[c]),
+        backgroundColor: ['#181715', '#5C5A54', '#9A9690', '#D9D6D0', '#ECEAE6'],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { font: { family: 'Archivo' }, color: '#5C5A54' } } }
+    }
+  });
+
+  // Chart 4: por cliente (barras horizontales)
+  chartInstances.clientes = new Chart(document.getElementById('chart-clientes'), {
+    type: 'bar',
+    data: {
+      labels: topClientes.map(c => c[0].length > 28 ? c[0].slice(0, 28) + '…' : c[0]),
+      datasets: [{ label: 'Facturado', data: topClientes.map(c => c[1]), backgroundColor: '#181715' }]
+    },
+    options: { ...chartBaseOptions(false), indexAxis: 'y' }
+  });
 }
 
 function chartBaseOptions(stacked) {
@@ -168,12 +175,11 @@ function chartBaseOptions(stacked) {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
-      x: { stacked: stacked, grid: { display: false }, ticks: { font: { family: 'Archivo' }, color: '#5C5A54' } },
-      y: { stacked: stacked, grid: { color: '#E6E3DD' }, ticks: { font: { family: 'Archivo' }, color: '#5C5A54' } },
+      x: { stacked, grid: { display: false }, ticks: { font: { family: 'Archivo' }, color: '#5C5A54' } },
+      y: { stacked, grid: { color: '#E6E3DD' }, ticks: { font: { family: 'Archivo' }, color: '#5C5A54' } },
     },
     plugins: {
-      legend: { display: false },
-      tooltip: { callbacks: { label: (ctx) => ` ${fmtMoney(ctx.parsed.y ?? ctx.parsed)}` } }
+      legend: { display: false }
     }
   };
 }

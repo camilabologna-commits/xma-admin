@@ -3,12 +3,6 @@
 // ============================================================
 let clientesQ = '';
 
-const DEPARTAMENTOS_UY = [
-  'Artigas','Canelones','Cerro Largo','Colonia','Durazno','Flores','Florida',
-  'Lavalleja','Maldonado','Montevideo','Paysandú','Río Negro','Rivera','Rocha',
-  'Salto','San José','Soriano','Tacuarembó','Treinta y Tres'
-];
-
 function renderClientes() {
   const content = document.getElementById('page-content');
   content.innerHTML = `
@@ -51,7 +45,12 @@ function renderClientesTable() {
     <table>
       <thead>
         <tr>
-          <th>Nombre</th><th>Contacto</th><th>Ubicación</th><th>Vendedor habitual</th><th class="text-right">Total comprado</th><th></th>
+          <th>Nombre</th>
+          <th>Ubicación</th>
+          <th>Contacto</th>
+          <th>Vendedor habitual</th>
+          <th class="text-right">Total comprado</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -60,8 +59,8 @@ function renderClientesTable() {
           return `
           <tr>
             <td style="font-weight:500;">${escapeHtml(c.nombre)}</td>
-            <td class="muted">${escapeHtml(c.telefono || c.email || '—')}</td>
             <td class="muted">${escapeHtml(ubicacion)}</td>
+            <td class="muted">${escapeHtml(c.telefono || c.email || '—')}</td>
             <td>${escapeHtml(c.vendedores?.nombre || '—')}</td>
             <td class="text-right mono">${fmtMoney(totalPorCliente[c.id] || 0)}</td>
             <td class="text-right">
@@ -91,14 +90,8 @@ function openClienteModal(id) {
         <div class="field"><label>Email</label><input type="email" id="c-email" value="${c ? escapeHtml(c.email || '') : ''}"></div>
       </div>
       <div class="grid grid-2">
-        <div class="field">
-          <label>Departamento</label>
-          <select id="c-departamento">
-            <option value="">— Seleccionar —</option>
-            ${DEPARTAMENTOS_UY.map(d => `<option value="${d}" ${c?.departamento === d ? 'selected' : ''}>${d}</option>`).join('')}
-          </select>
-        </div>
-        <div class="field"><label>Ciudad</label><input type="text" id="c-ciudad" value="${c ? escapeHtml(c.ciudad || '') : ''}"></div>
+        <div class="field"><label>Departamento</label><input type="text" id="c-departamento" value="${c ? escapeHtml(c.departamento || '') : ''}" placeholder="Ej: Montevideo"></div>
+        <div class="field"><label>Ciudad</label><input type="text" id="c-ciudad" value="${c ? escapeHtml(c.ciudad || '') : ''}" placeholder="Ej: Montevideo"></div>
       </div>
       <div class="field"><label>Dirección</label><input type="text" id="c-direccion" value="${c ? escapeHtml(c.direccion || '') : ''}"></div>
       <div class="field">
@@ -120,14 +113,14 @@ function openClienteModal(id) {
   document.getElementById('cliente-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const payload = {
-      nombre: document.getElementById('c-nombre').value.trim(),
-      telefono: document.getElementById('c-telefono').value.trim() || null,
-      email: document.getElementById('c-email').value.trim() || null,
-      departamento: document.getElementById('c-departamento').value || null,
-      ciudad: document.getElementById('c-ciudad').value.trim() || null,
-      direccion: document.getElementById('c-direccion').value.trim() || null,
-      vendedor_id: document.getElementById('c-vendedor').value || null,
-      notas: document.getElementById('c-notas').value.trim() || null,
+      nombre:       document.getElementById('c-nombre').value.trim(),
+      telefono:     document.getElementById('c-telefono').value.trim() || null,
+      email:        document.getElementById('c-email').value.trim() || null,
+      departamento: document.getElementById('c-departamento').value.trim() || null,
+      ciudad:       document.getElementById('c-ciudad').value.trim() || null,
+      direccion:    document.getElementById('c-direccion').value.trim() || null,
+      vendedor_id:  document.getElementById('c-vendedor').value || null,
+      notas:        document.getElementById('c-notas').value.trim() || null,
     };
     const { error } = c
       ? await sb.from('clientes').update(payload).eq('id', c.id)

@@ -6,12 +6,12 @@ let ventasFiltro = { tab: 'todas', vendedor: '', mes: '', q: '' };
 function renderVentas() {
   const content = document.getElementById('page-content');
 
-  const totalOficial = state.ventas
-    .filter(v => v.tipo_factura === 'oficial')
-    .reduce((s, v) => s + Number(v.total), 0);
-  const totalOtras = state.ventas
-    .filter(v => v.tipo_factura === 'otras')
-    .reduce((s, v) => s + Number(v.total), 0);
+  // Totales para el resumen
+  const todas   = state.ventas;
+  const oficial = todas.filter(v => v.tipo_factura === 'oficial');
+  const otras   = todas.filter(v => v.tipo_factura === 'otras');
+  const totalOficial = oficial.reduce((s, v) => s + Number(v.total), 0);
+  const totalOtras   = otras.reduce((s, v) => s + Number(v.total), 0);
   const totalGeneral = totalOficial + totalOtras;
 
   content.innerHTML = `
@@ -25,30 +25,33 @@ function renderVentas() {
       </div>
     </div>
 
-    <div class="grid grid-3" style="margin-bottom:24px;">
+    <!-- Resumen general -->
+    <div class="grid grid-3" style="margin-bottom:20px;">
       <div class="stat-card">
         <div class="stat-label">Total oficial</div>
         <div class="stat-value">${fmtMoney(totalOficial)}</div>
-        <div class="stat-sub">${state.ventas.filter(v => v.tipo_factura === 'oficial').length} factura(s)</div>
+        <div class="stat-sub">${oficial.length} venta(s)</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Total otras</div>
         <div class="stat-value">${fmtMoney(totalOtras)}</div>
-        <div class="stat-sub">${state.ventas.filter(v => v.tipo_factura === 'otras').length} factura(s)</div>
+        <div class="stat-sub">${otras.length} venta(s)</div>
       </div>
-      <div class="stat-card" style="border-left:3px solid var(--ink);">
-        <div class="stat-label">Total combinado</div>
+      <div class="stat-card" style="border-color:var(--ink);">
+        <div class="stat-label">Total general</div>
         <div class="stat-value">${fmtMoney(totalGeneral)}</div>
-        <div class="stat-sub">${state.ventas.length} ventas en total</div>
+        <div class="stat-sub">${todas.length} venta(s) en total</div>
       </div>
     </div>
 
-    <div class="tabs" id="ventas-tabs">
+    <!-- Tabs -->
+    <div class="tabs">
       <div class="tab ${ventasFiltro.tab === 'todas'   ? 'active' : ''}" data-tab="todas">Todas</div>
       <div class="tab ${ventasFiltro.tab === 'oficial' ? 'active' : ''}" data-tab="oficial">Oficial</div>
       <div class="tab ${ventasFiltro.tab === 'otras'   ? 'active' : ''}" data-tab="otras">Otras</div>
     </div>
 
+    <!-- Filtros -->
     <div class="filter-bar">
       <input type="text" class="search-input" id="filtro-q" placeholder="Buscar cliente…" value="${escapeHtml(ventasFiltro.q)}">
       <select id="filtro-vendedor" class="search-input" style="min-width:160px;">
@@ -68,10 +71,11 @@ function renderVentas() {
   document.getElementById('filtro-q').addEventListener('input', (e) => { ventasFiltro.q = e.target.value; renderVentasTable(); });
   document.getElementById('filtro-vendedor').addEventListener('change', (e) => { ventasFiltro.vendedor = e.target.value; renderVentasTable(); });
   document.getElementById('filtro-mes').addEventListener('change', (e) => { ventasFiltro.mes = e.target.value; renderVentasTable(); });
-  document.querySelectorAll('#ventas-tabs .tab').forEach(tab => {
+
+  document.querySelectorAll('.tab[data-tab]').forEach(tab => {
     tab.addEventListener('click', () => {
       ventasFiltro.tab = tab.dataset.tab;
-      document.querySelectorAll('#ventas-tabs .tab').forEach(t => t.classList.toggle('active', t === tab));
+      document.querySelectorAll('.tab[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === ventasFiltro.tab));
       renderVentasTable();
     });
   });
@@ -125,7 +129,7 @@ function renderVentasTable() {
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="5" style="text-align:right;font-weight:600;">Total filtrado</td>
+          <td colspan="5" style="text-align:right;font-weight:600;">Total</td>
           <td class="text-right mono" style="font-weight:600;">${fmtMoney(totalFiltrado)}</td>
           <td></td>
         </tr>
