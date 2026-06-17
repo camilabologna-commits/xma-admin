@@ -62,8 +62,9 @@ h1,h2,h3{
 }
 .logo-img{
   display:block;
-  height:180px;
-  width:auto;
+  width:100%;
+  max-width:160px;
+  height:auto;
   object-fit:contain;
 }
 .logo-img--white{
@@ -96,7 +97,8 @@ h1,h2,h3{
   margin-bottom:12px;
 }
 .login-logo .logo-img{
-  height:180px;
+  max-width:220px;
+  height:auto;
 }
 .login-sub{
   text-align:center;
