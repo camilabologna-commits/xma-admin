@@ -60,6 +60,15 @@ h1,h2,h3{
   font-weight:700;
   letter-spacing:0.08em;
 }
+.logo-img{
+  display:block;
+  height:32px;
+  width:auto;
+  object-fit:contain;
+}
+.logo-img--white{
+  filter:brightness(0) invert(1);
+}
 
 /* ---------- Scrollbar (sutil) ---------- */
 ::-webkit-scrollbar{width:8px;height:8px;}
@@ -82,9 +91,12 @@ h1,h2,h3{
   border-radius:var(--radius-lg);
 }
 .login-logo{
-  font-size:32px;
-  text-align:center;
-  margin-bottom:4px;
+  display:flex;
+  justify-content:center;
+  margin-bottom:12px;
+}
+.login-logo .logo-img{
+  height:40px;
 }
 .login-sub{
   text-align:center;
