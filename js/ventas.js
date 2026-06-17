@@ -1,10 +1,18 @@
 // ============================================================
 // VENTAS
 // ============================================================
-let ventasFiltro = { tipo: '', vendedor: '', mes: '', q: '' };
+let ventasFiltro = { tab: 'todas', vendedor: '', mes: '', q: '' };
 
 function renderVentas() {
   const content = document.getElementById('page-content');
+
+  const totalOficial = state.ventas
+    .filter(v => v.tipo_factura === 'oficial')
+    .reduce((s, v) => s + Number(v.total), 0);
+  const totalOtras = state.ventas
+    .filter(v => v.tipo_factura === 'otras')
+    .reduce((s, v) => s + Number(v.total), 0);
+  const totalGeneral = totalOficial + totalOtras;
 
   content.innerHTML = `
     <div class="page-header">
@@ -17,13 +25,32 @@ function renderVentas() {
       </div>
     </div>
 
+    <div class="grid grid-3" style="margin-bottom:24px;">
+      <div class="stat-card">
+        <div class="stat-label">Total oficial</div>
+        <div class="stat-value">${fmtMoney(totalOficial)}</div>
+        <div class="stat-sub">${state.ventas.filter(v => v.tipo_factura === 'oficial').length} factura(s)</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total otras</div>
+        <div class="stat-value">${fmtMoney(totalOtras)}</div>
+        <div class="stat-sub">${state.ventas.filter(v => v.tipo_factura === 'otras').length} factura(s)</div>
+      </div>
+      <div class="stat-card" style="border-left:3px solid var(--ink);">
+        <div class="stat-label">Total combinado</div>
+        <div class="stat-value">${fmtMoney(totalGeneral)}</div>
+        <div class="stat-sub">${state.ventas.length} ventas en total</div>
+      </div>
+    </div>
+
+    <div class="tabs" id="ventas-tabs">
+      <div class="tab ${ventasFiltro.tab === 'todas'   ? 'active' : ''}" data-tab="todas">Todas</div>
+      <div class="tab ${ventasFiltro.tab === 'oficial' ? 'active' : ''}" data-tab="oficial">Oficial</div>
+      <div class="tab ${ventasFiltro.tab === 'otras'   ? 'active' : ''}" data-tab="otras">Otras</div>
+    </div>
+
     <div class="filter-bar">
       <input type="text" class="search-input" id="filtro-q" placeholder="Buscar cliente…" value="${escapeHtml(ventasFiltro.q)}">
-      <select id="filtro-tipo" class="search-input" style="min-width:140px;">
-        <option value="">Todos los tipos</option>
-        <option value="oficial" ${ventasFiltro.tipo === 'oficial' ? 'selected' : ''}>Oficial</option>
-        <option value="otras" ${ventasFiltro.tipo === 'otras' ? 'selected' : ''}>Otras</option>
-      </select>
       <select id="filtro-vendedor" class="search-input" style="min-width:160px;">
         <option value="">Todos los vendedores</option>
         <option value="__none__" ${ventasFiltro.vendedor === '__none__' ? 'selected' : ''}>Sin vendedor</option>
@@ -39,16 +66,22 @@ function renderVentas() {
 
   document.getElementById('nueva-venta-btn').addEventListener('click', () => openVentaModal());
   document.getElementById('filtro-q').addEventListener('input', (e) => { ventasFiltro.q = e.target.value; renderVentasTable(); });
-  document.getElementById('filtro-tipo').addEventListener('change', (e) => { ventasFiltro.tipo = e.target.value; renderVentasTable(); });
   document.getElementById('filtro-vendedor').addEventListener('change', (e) => { ventasFiltro.vendedor = e.target.value; renderVentasTable(); });
   document.getElementById('filtro-mes').addEventListener('change', (e) => { ventasFiltro.mes = e.target.value; renderVentasTable(); });
+  document.querySelectorAll('#ventas-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      ventasFiltro.tab = tab.dataset.tab;
+      document.querySelectorAll('#ventas-tabs .tab').forEach(t => t.classList.toggle('active', t === tab));
+      renderVentasTable();
+    });
+  });
 
   renderVentasTable();
 }
 
 function getVentasFiltradas() {
   return state.ventas.filter(v => {
-    if (ventasFiltro.tipo && v.tipo_factura !== ventasFiltro.tipo) return false;
+    if (ventasFiltro.tab !== 'todas' && v.tipo_factura !== ventasFiltro.tab) return false;
     if (ventasFiltro.vendedor === '__none__' && v.vendedor_id) return false;
     if (ventasFiltro.vendedor && ventasFiltro.vendedor !== '__none__' && v.vendedor_id !== ventasFiltro.vendedor) return false;
     if (ventasFiltro.mes && !v.fecha.startsWith(ventasFiltro.mes)) return false;
@@ -221,15 +254,13 @@ function openVentaModal() {
   document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
   document.getElementById('add-line-btn').addEventListener('click', () => addVentaLine());
 
-  // Autoseleccionar vendedor habitual del cliente
   document.getElementById('v-cliente').addEventListener('change', (e) => {
     const opt = e.target.selectedOptions[0];
     const vendedorId = opt?.dataset.vendedor;
     if (vendedorId) document.getElementById('v-vendedor').value = vendedorId;
   });
 
-  addVentaLine(); // primera línea vacía
-
+  addVentaLine();
   document.getElementById('venta-form').addEventListener('submit', submitVenta);
 }
 
@@ -302,7 +333,6 @@ async function submitVenta(e) {
     return;
   }
 
-  // Validar stock disponible
   for (const line of validLines) {
     const variante = state.variantes.find(v => v.id === line.varianteId);
     if (variante && line.cantidad > variante.stock) {
@@ -321,7 +351,6 @@ async function submitVenta(e) {
   const vendedorId = document.getElementById('v-vendedor').value || null;
   const notas = document.getElementById('v-notas').value.trim() || null;
 
-  // 1. crear venta (total se recalcula por trigger, pero insertamos 0 inicial)
   const { data: ventaData, error: ventaError } = await sb.from('ventas').insert({
     fecha, tipo_factura: tipo, cliente_id: clienteId, vendedor_id: vendedorId, notas, total: 0
   }).select().single();
@@ -333,7 +362,6 @@ async function submitVenta(e) {
     return;
   }
 
-  // 2. crear items
   const itemsToInsert = validLines.map(line => {
     const variante = state.variantes.find(v => v.id === line.varianteId);
     const desc = variante ? `${variante.productos?.articulo} · ${variante.productos?.nombre} — ${variante.talle}/${variante.color}` : 'Producto';

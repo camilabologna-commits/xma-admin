@@ -3,6 +3,12 @@
 // ============================================================
 let clientesQ = '';
 
+const DEPARTAMENTOS_UY = [
+  'Artigas','Canelones','Cerro Largo','Colonia','Durazno','Flores','Florida',
+  'Lavalleja','Maldonado','Montevideo','Paysandú','Río Negro','Rivera','Rocha',
+  'Salto','San José','Soriano','Tacuarembó','Treinta y Tres'
+];
+
 function renderClientes() {
   const content = document.getElementById('page-content');
   content.innerHTML = `
@@ -36,7 +42,6 @@ function renderClientesTable() {
     return;
   }
 
-  // total comprado por cliente
   const totalPorCliente = {};
   state.ventas.forEach(v => {
     if (v.cliente_id) totalPorCliente[v.cliente_id] = (totalPorCliente[v.cliente_id] || 0) + Number(v.total);
@@ -44,12 +49,19 @@ function renderClientesTable() {
 
   wrap.innerHTML = `
     <table>
-      <thead><tr><th>Nombre</th><th>Contacto</th><th>Vendedor habitual</th><th class="text-right">Total comprado</th><th></th></tr></thead>
+      <thead>
+        <tr>
+          <th>Nombre</th><th>Contacto</th><th>Ubicación</th><th>Vendedor habitual</th><th class="text-right">Total comprado</th><th></th>
+        </tr>
+      </thead>
       <tbody>
-        ${clientes.map(c => `
+        ${clientes.map(c => {
+          const ubicacion = [c.ciudad, c.departamento].filter(Boolean).join(', ') || '—';
+          return `
           <tr>
             <td style="font-weight:500;">${escapeHtml(c.nombre)}</td>
             <td class="muted">${escapeHtml(c.telefono || c.email || '—')}</td>
+            <td class="muted">${escapeHtml(ubicacion)}</td>
             <td>${escapeHtml(c.vendedores?.nombre || '—')}</td>
             <td class="text-right mono">${fmtMoney(totalPorCliente[c.id] || 0)}</td>
             <td class="text-right">
@@ -57,7 +69,7 @@ function renderClientesTable() {
               <button class="icon-btn" data-del="${c.id}">Borrar</button>
             </td>
           </tr>
-        `).join('')}
+        `}).join('')}
       </tbody>
     </table>
   `;
@@ -77,6 +89,16 @@ function openClienteModal(id) {
       <div class="grid grid-2">
         <div class="field"><label>Teléfono</label><input type="text" id="c-telefono" value="${c ? escapeHtml(c.telefono || '') : ''}"></div>
         <div class="field"><label>Email</label><input type="email" id="c-email" value="${c ? escapeHtml(c.email || '') : ''}"></div>
+      </div>
+      <div class="grid grid-2">
+        <div class="field">
+          <label>Departamento</label>
+          <select id="c-departamento">
+            <option value="">— Seleccionar —</option>
+            ${DEPARTAMENTOS_UY.map(d => `<option value="${d}" ${c?.departamento === d ? 'selected' : ''}>${d}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field"><label>Ciudad</label><input type="text" id="c-ciudad" value="${c ? escapeHtml(c.ciudad || '') : ''}"></div>
       </div>
       <div class="field"><label>Dirección</label><input type="text" id="c-direccion" value="${c ? escapeHtml(c.direccion || '') : ''}"></div>
       <div class="field">
@@ -101,6 +123,8 @@ function openClienteModal(id) {
       nombre: document.getElementById('c-nombre').value.trim(),
       telefono: document.getElementById('c-telefono').value.trim() || null,
       email: document.getElementById('c-email').value.trim() || null,
+      departamento: document.getElementById('c-departamento').value || null,
+      ciudad: document.getElementById('c-ciudad').value.trim() || null,
       direccion: document.getElementById('c-direccion').value.trim() || null,
       vendedor_id: document.getElementById('c-vendedor').value || null,
       notas: document.getElementById('c-notas').value.trim() || null,

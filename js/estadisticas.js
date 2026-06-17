@@ -12,22 +12,21 @@ function renderEstadisticas() {
   const content = document.getElementById('page-content');
   destroyCharts();
 
-  // Agrupar ventas por mes (últimos 12 meses con datos)
+  // Agrupar ventas por mes
   const porMes = {};
   state.ventas.forEach(v => {
     const mes = v.fecha.slice(0, 7);
-    if (!porMes[mes]) porMes[mes] = { oficial: 0, otras: 0, total: 0 };
-    porMes[mes][v.tipo_factura] += Number(v.total);
+    if (!porMes[mes]) porMes[mes] = { total: 0 };
     porMes[mes].total += Number(v.total);
   });
   const mesesOrdenados = Object.keys(porMes).sort();
   const ultimosMeses = mesesOrdenados.slice(-12);
 
-  // Proyección simple: promedio móvil de los últimos 3 meses con datos
+  // Proyección simple: promedio móvil de los últimos 3 meses
   const last3 = ultimosMeses.slice(-3).map(m => porMes[m].total);
   const promedioMovil = last3.length > 0 ? last3.reduce((a, b) => a + b, 0) / last3.length : 0;
 
-  // tendencia (regresión lineal simple sobre los últimos meses)
+  // Tendencia por regresión lineal
   let proyeccionTendencia = promedioMovil;
   if (ultimosMeses.length >= 2) {
     const ys = ultimosMeses.map(m => porMes[m].total);
@@ -52,15 +51,13 @@ function renderEstadisticas() {
   });
   const topProductos = Object.entries(productoQty).sort((a, b) => b[1] - a[1]).slice(0, 8);
 
-  // Ventas por categoría
-  const categoriaTotal = {};
+  // Facturación por cliente (top 8)
+  const porCliente = {};
   state.ventas.forEach(v => {
-    (v.venta_items || []).forEach(it => {
-      const variante = state.variantes.find(va => va.id === it.variante_id);
-      const cat = variante?.productos?.categoria || 'Otro';
-      categoriaTotal[cat] = (categoriaTotal[cat] || 0) + Number(it.subtotal);
-    });
+    const nombre = v.clientes?.nombre || 'Sin cliente';
+    porCliente[nombre] = (porCliente[nombre] || 0) + Number(v.total);
   });
+  const topClientes = Object.entries(porCliente).sort((a, b) => b[1] - a[1]).slice(0, 8);
 
   content.innerHTML = `
     <div class="page-header">
@@ -89,7 +86,7 @@ function renderEstadisticas() {
     </div>
 
     <div class="chart-card" style="margin-bottom:18px;">
-      <div class="section-title">Facturación mensual — Oficial vs. Otras</div>
+      <div class="section-title">Facturación mensual</div>
       <div class="chart-wrap"><canvas id="chart-mensual"></canvas></div>
     </div>
 
@@ -99,8 +96,8 @@ function renderEstadisticas() {
         <div class="chart-wrap"><canvas id="chart-productos"></canvas></div>
       </div>
       <div class="chart-card">
-        <div class="section-title">Facturación por categoría</div>
-        <div class="chart-wrap"><canvas id="chart-categoria"></canvas></div>
+        <div class="section-title">Facturación por cliente (top 8)</div>
+        <div class="chart-wrap"><canvas id="chart-clientes"></canvas></div>
       </div>
     </div>
   `;
@@ -110,49 +107,60 @@ function renderEstadisticas() {
     return;
   }
 
-  // Chart 1: facturación mensual
+  // Chart 1: facturación mensual total
   const ctx1 = document.getElementById('chart-mensual');
   chartInstances.mensual = new Chart(ctx1, {
     type: 'bar',
     data: {
       labels: ultimosMeses.map(m => monthLabel(m + '-01')),
       datasets: [
-        { label: 'Oficial', data: ultimosMeses.map(m => porMes[m].oficial), backgroundColor: '#181715' },
-        { label: 'Otras', data: ultimosMeses.map(m => porMes[m].otras), backgroundColor: '#D9D6D0' },
+        { label: 'Total', data: ultimosMeses.map(m => porMes[m].total), backgroundColor: '#181715' },
       ]
     },
-    options: chartBaseOptions(true)
+    options: chartBaseOptions(false)
   });
 
   // Chart 2: productos top
-  const ctx2 = document.getElementById('chart-productos');
-  chartInstances.productos = new Chart(ctx2, {
-    type: 'bar',
-    data: {
-      labels: topProductos.map(p => p[0].length > 28 ? p[0].slice(0, 28) + '…' : p[0]),
-      datasets: [{ label: 'Unidades', data: topProductos.map(p => p[1]), backgroundColor: '#181715' }]
-    },
-    options: { ...chartBaseOptions(false), indexAxis: 'y' }
-  });
+  if (topProductos.length > 0) {
+    const ctx2 = document.getElementById('chart-productos');
+    chartInstances.productos = new Chart(ctx2, {
+      type: 'bar',
+      data: {
+        labels: topProductos.map(p => p[0].length > 28 ? p[0].slice(0, 28) + '…' : p[0]),
+        datasets: [{ label: 'Unidades', data: topProductos.map(p => p[1]), backgroundColor: '#181715' }]
+      },
+      options: { ...chartBaseOptions(false), indexAxis: 'y' }
+    });
+  }
 
-  // Chart 3: categoría
-  const ctx3 = document.getElementById('chart-categoria');
-  const catLabels = Object.keys(categoriaTotal);
-  chartInstances.categoria = new Chart(ctx3, {
-    type: 'doughnut',
-    data: {
-      labels: catLabels,
-      datasets: [{
-        data: catLabels.map(c => categoriaTotal[c]),
-        backgroundColor: ['#181715', '#5C5A54', '#9A9690', '#D9D6D0', '#ECEAE6'],
-        borderWidth: 0,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { font: { family: 'Archivo' }, color: '#5C5A54' } } }
-    }
-  });
+  // Chart 3: facturación por cliente
+  if (topClientes.length > 0) {
+    const ctx3 = document.getElementById('chart-clientes');
+    const palette = ['#181715','#3A3835','#5C5A54','#7E7B74','#9A9690','#B6B3AD','#D2CFC9','#E6E3DD'];
+    chartInstances.clientes = new Chart(ctx3, {
+      type: 'doughnut',
+      data: {
+        labels: topClientes.map(c => c[0]),
+        datasets: [{
+          data: topClientes.map(c => c[1]),
+          backgroundColor: palette.slice(0, topClientes.length),
+          borderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { family: 'Archivo' }, color: '#5C5A54', boxWidth: 12 } },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` ${fmtMoney(ctx.parsed)}`
+            }
+          }
+        }
+      }
+    });
+  }
 }
 
 function chartBaseOptions(stacked) {
@@ -164,7 +172,8 @@ function chartBaseOptions(stacked) {
       y: { stacked: stacked, grid: { color: '#E6E3DD' }, ticks: { font: { family: 'Archivo' }, color: '#5C5A54' } },
     },
     plugins: {
-      legend: { display: stacked, position: 'bottom', labels: { font: { family: 'Archivo' }, color: '#5C5A54' } }
+      legend: { display: false },
+      tooltip: { callbacks: { label: (ctx) => ` ${fmtMoney(ctx.parsed.y ?? ctx.parsed)}` } }
     }
   };
 }
